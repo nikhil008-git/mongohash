@@ -14,7 +14,6 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "middleware": "^1.0.0",
-    "mongoose": "^8.18.0",
-    "moongose": "^1.0.0"
+    "mongoose": "^8.18.0"
   }
 }

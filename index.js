@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const JWT_SECRET = "your_jwt_secret";
 const mongoose = require("mongoose")
 const { UsedModel, TodoModel }  = require("./db")
-mongoose.connect("mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.ooifsba.mongodb.net/todos")
+mongoose.connect("mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.jnwwvsf.mongodb.net/todos")
 const app = express();
 app.use(express.json());
 

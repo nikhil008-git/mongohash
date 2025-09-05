@@ -4,16 +4,17 @@ const jwt = require("jsonwebtoken");
 const JWT_SECRET = "your_jwt_secret";
 const mongoose = require("mongoose")
 const { UserModel , TodoModel }  = require("./db")
-mongoose.connect("")
+mongoose.connect("mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.jnwwvsf.mongodb.net/todos")
 const app = express();
 app.use(express.json());
-
-app.post("/signup", async function(req, res) {
+app.use(express.urlencoded({ extended: true }));
+app.post("/signup",  function(req, res) {
+    console.log("this is signup endpoint")
     const email = req.body.email;
     const password = req.body.password;
     const name = req.body.name;
 
-    await UserModel.create({
+     UserModel.create({
         email: email,
         password: password,
         name: name
@@ -49,7 +50,7 @@ app.post("/signin", async function(req, res) {
 });
 
 function auth(req, res, next) {
-    const token = req.headers.authorization;
+    const token = req.headers.token;
 
     const response = jwt.verify(token, JWT_SECRET);
 

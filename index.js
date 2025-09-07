@@ -15,7 +15,7 @@ const app = express();
 app.use(express.json());
 
 const JWT_SECRET = "your_jwt_secret"; // ideally use process.env.JWT_SECRET
-const mongoose = "mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.jnwwvsf.mongodb.net/todos";
+const mongoose = "";
 
 // -------------------- AUTH MIDDLEWARE --------------------
 function auth(req, res, next) {

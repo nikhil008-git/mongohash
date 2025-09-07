@@ -1,122 +1,146 @@
-// server.js
+const express = require("express");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt")
 
-import express from "express";
-import mongoose from "mongoose";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import { z } from "zod";
-
-import { UserModel, TodoModel } from "./db.js";
-import { signupSchema, signinSchema } from "./schema/authschema.js";
-import { createTodoSchema } from "./schema/todoSchema.js";
-
-// -------------------- CONFIG --------------------
+const JWT_SECRET = "your_jwt_secret";
+const mongoose = require("mongoose")
+const { UserModel , TodoModel }  = require("./db")
+mongoose.connect("mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.jnwwvsf.mongodb.net/todos")
 const app = express();
+import { signupSchema, signinSchema } from "./schema/authschema";
+import { createTodoSchema } from "./schema/todoSchema";
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-const JWT_SECRET = "your_jwt_secret"; // ideally use process.env.JWT_SECRET
-const mongoose = "";
 
-// -------------------- AUTH MIDDLEWARE --------------------
+app.post("/signup",  async function(req, res) {
+   try { console.log("this is signup endpoint")
+    const parsedData = signupSchema.safeParse(req.body);
+    if (!parsedData.success) {
+        return res.status(400).json({
+            message: parsedData.error.errors.map(e => e.message).join(", ")
+        });
+    }
+    const email = parsedData.data.email;
+    const password = parsedData.data.password;
+    const name = parsedData.data.name;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await UserModel.create({
+        email: email,
+        password: hashedPassword,
+        name: name
+    });
+    
+    res.json({  
+        message: "You are signed up"
+    })}
+    catch(err){
+        if(err.code === 11000){
+            res.status(400).json({
+                message: "User already exists"
+            })
+        }else{
+            res.status(500).json({
+                message: "Internal server error"
+            })
+        }
+
+app.post("/signin", async function(req, res) {
+   try{
+    const parsedData = signinSchema.safeParse(req.body);
+    if (!parsedData.success) {
+        return res.status(400).json({
+            message: parsedData.error.errors.map(e => e.message).join(", ")
+        });
+    }
+    const email = parsedData.data.email;
+    const password = parsedData.data.password;
+
+    const response = await UserModel.findOne({
+        email: email,
+      
+    });
+    const passwordMatch = await bcrypt.compare(password, response.password);
+
+    if (response && passwordMatch) {
+        const token = jwt.sign({
+            id: response._id.toString()
+        }, JWT_SECRET);
+
+        res.json({
+            token
+        })
+    } } catch(err) {
+        res.status(403).json({
+            message: "Incorrect creds"
+        })
+    }
+});
+
 function auth(req, res, next) {
-    try {
-        const token = req.headers.token;
-        if (!token) throw new Error("No token provided");
+    const token = req.headers.token;
 
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.userId = decoded.id;
+    const response = jwt.verify(token, JWT_SECRET);
+
+    if (response) {
+        req.userId = response.id;
         next();
-    } catch (err) {
-        res.status(403).json({ message: "Incorrect creds" });
+    } else {
+        res.status(403).json({
+            message: "Incorrect creds"
+        })
     }
 }
 
-// -------------------- SIGNUP --------------------
-app.post("/signup", async (req, res) => {
-    try {
-        const parsedData = signupSchema.safeParse(req.body);
-        if (!parsedData.success) {
-            return res.status(400).json({
-                message: parsedData.error.errors.map(e => e.message).join(", ")
-            });
-        }
-
-        const { email, password, name } = parsedData.data;
-
-        // Check if user exists
-        const existingUser = await UserModel.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: "User already exists" });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        await UserModel.create({ email, password: hashedPassword, name });
-
-        res.json({ message: "You are signed up" });
-    } catch (err) {
-        res.status(500).json({ message: "Internal server error" });
-    }
-});
-
-// -------------------- SIGNIN --------------------
-app.post("/signin", async (req, res) => {
-    try {
-        const parsedData = signinSchema.safeParse(req.body);
-        if (!parsedData.success) {
-            return res.status(400).json({
-                message: parsedData.error.errors.map(e => e.message).join(", ")
-            });
-        }
-
-        const { email, password } = parsedData.data;
-        const user = await UserModel.findOne({ email });
-
-        if (!user) {
-            return res.status(403).json({ message: "Incorrect creds" });
-        }
-
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (!passwordMatch) {
-            return res.status(403).json({ message: "Incorrect creds" });
-        }
-
-        const token = jwt.sign({ id: user._id.toString() }, JWT_SECRET);
-        res.json({ token });
-    } catch (err) {
-        res.status(500).json({ message: "Internal server error" });
-    }
-});
-
-// -------------------- CREATE TODO --------------------
-app.post("/todo", auth, async (req, res) => {
+app.post("/todo", auth, async function(req, res) {
     try {
         const parsed = createTodoSchema.safeParse(req.body);
-        if (!parsed.success) {
-            return res.status(400).json({ errors: parsed.error.errors });
-        }
-
-        const { title, done } = parsed.data;
+    if (!parsed.success) {
+      return res.status(400).json({ errors: parsed.error.errors });
+    }
         const userId = req.userId;
+        const title = parsed.data.title;
+        const done = parsed.data.done;
 
-        await TodoModel.create({ userId, title, done });
-        res.json({ message: "Todo created" });
-    } catch (err) {
-        res.status(500).json({ message: "Internal server error" });
+    await TodoModel.create({
+        userId,
+        title,
+        done
+    });
+
+    res.json({
+        message: "Todo created"
+    })
+} catch(err) {
+    res.status(500).json({
+        message: "Internal server error"
+    })
+}
+});
+app.get("/todos", auth, async function(req, res) {
+  try {
+    const parsed = createTodoSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ errors: parsed.error.errors });
+    }
+    const userId = req.userId;
+
+    const todos = await TodoModel.find({
+        userId
+    });
+
+    res.json({
+        todos
+    }) } catch(err) {
+        res.status(500).json({
+            message: "Internal server error"
+        })
     }
 });
 
-// -------------------- GET TODOS --------------------
-app.get("/todos", auth, async (req, res) => {
-    try {
-        const userId = req.userId;
-        const todos = await TodoModel.find({ userId });
-        res.json({ todos });
-    } catch (err) {
-        res.status(500).json({ message: "Internal server error" });
-    }
-});
-
-// -------------------- START SERVER --------------------
-app.listen(3000, () => {
+app.listen(3000,()=>{
     console.log("Server is running on port 3000");
+});
+    }
 });

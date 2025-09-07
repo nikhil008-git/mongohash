@@ -6,7 +6,7 @@ import { z } from "zod";
 const JWT_SECRET = "your_jwt_secret";
 const mongoose = require("mongoose")
 const { UserModel , TodoModel }  = require("./db")
-mongoose.connect("mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.jnwwvsf.mongodb.net/todos")
+mongoose.connect("")
 const app = express();
 import { signupSchema, signinSchema } from "./schema/authschema";
 import { createTodoSchema } from "./schema/todoSchema";

@@ -1,96 +1,126 @@
+// server.js
 
-const express = require("express");
-const jwt = require("jsonwebtoken");
-const JWT_SECRET = "your_jwt_secret";
-const mongoose = require("mongoose")
-const { UserModel , TodoModel }  = require("./db")
-mongoose.connect("")
+import express from "express";
+import mongoose from "mongoose";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { z } from "zod";
+
+import { UserModel, TodoModel } from "./db.js";
+import { signupSchema, signinSchema } from "./schema/authschema.js";
+import { createTodoSchema } from "./schema/todoSchema.js";
+
+// -------------------- CONFIG --------------------
 const app = express();
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.post("/signup",  function(req, res) {
-    console.log("this is signup endpoint")
-    const email = req.body.email;
-    const password = req.body.password;
-    const name = req.body.name;
 
-     UserModel.create({
-        email: email,
-        password: password,
-        name: name
-    });
-    
-    res.json({
-        message: "You are signed up"
-    })
-});
+const JWT_SECRET = "your_jwt_secret"; // ideally use process.env.JWT_SECRET
+const MONGO_URI = "mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.jnwwvsf.mongodb.net/todos";
 
-app.post("/signin", async function(req, res) {
-    const email = req.body.email;
-    const password = req.body.password;
+mongoose.connect(MONGO_URI)
+    .then(() => console.log("MongoDB connected"))
+    .catch(err => console.error("MongoDB connection error:", err));
 
-    const response = await UserModel.findOne({
-        email: email,
-        password: password,
-    });
-
-    if (response) {
-        const token = jwt.sign({
-            id: response._id.toString()
-        }, JWT_SECRET);
-
-        res.json({
-            token
-        })
-    } else {
-        res.status(403).json({
-            message: "Incorrect creds"
-        })
-    }
-});
-
+// -------------------- AUTH MIDDLEWARE --------------------
 function auth(req, res, next) {
-    const token = req.headers.token;
+    try {
+        const token = req.headers.token;
+        if (!token) throw new Error("No token provided");
 
-    const response = jwt.verify(token, JWT_SECRET);
-
-    if (response) {
-        req.userId = response.id;
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.userId = decoded.id;
         next();
-    } else {
-        res.status(403).json({
-            message: "Incorrect creds"
-        })
+    } catch (err) {
+        res.status(403).json({ message: "Incorrect creds" });
     }
 }
 
-app.post("/todo", auth, async function(req, res) {
-    const userId = req.userId;
-    const title = req.body.title;
-    const done = req.body.done;
+// -------------------- SIGNUP --------------------
+app.post("/signup", async (req, res) => {
+    try {
+        const parsedData = signupSchema.safeParse(req.body);
+        if (!parsedData.success) {
+            return res.status(400).json({
+                message: parsedData.error.errors.map(e => e.message).join(", ")
+            });
+        }
 
-    await TodoModel.create({
-        userId,
-        title,
-        done
-    });
+        const { email, password, name } = parsedData.data;
 
-    res.json({
-        message: "Todo created"
-    })
+        // Check if user exists
+        const existingUser = await UserModel.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: "User already exists" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await UserModel.create({ email, password: hashedPassword, name });
+
+        res.json({ message: "You are signed up" });
+    } catch (err) {
+        res.status(500).json({ message: "Internal server error" });
+    }
 });
-app.get("/todos", auth, async function(req, res) {
-    const userId = req.userId;
 
-    const todos = await TodoModel.find({
-        userId
-    });
+// -------------------- SIGNIN --------------------
+app.post("/signin", async (req, res) => {
+    try {
+        const parsedData = signinSchema.safeParse(req.body);
+        if (!parsedData.success) {
+            return res.status(400).json({
+                message: parsedData.error.errors.map(e => e.message).join(", ")
+            });
+        }
 
-    res.json({
-        todos
-    })
+        const { email, password } = parsedData.data;
+        const user = await UserModel.findOne({ email });
+
+        if (!user) {
+            return res.status(403).json({ message: "Incorrect creds" });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        if (!passwordMatch) {
+            return res.status(403).json({ message: "Incorrect creds" });
+        }
+
+        const token = jwt.sign({ id: user._id.toString() }, JWT_SECRET);
+        res.json({ token });
+    } catch (err) {
+        res.status(500).json({ message: "Internal server error" });
+    }
 });
 
-app.listen(3000,()=>{
+// -------------------- CREATE TODO --------------------
+app.post("/todo", auth, async (req, res) => {
+    try {
+        const parsed = createTodoSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ errors: parsed.error.errors });
+        }
+
+        const { title, done } = parsed.data;
+        const userId = req.userId;
+
+        await TodoModel.create({ userId, title, done });
+        res.json({ message: "Todo created" });
+    } catch (err) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// -------------------- GET TODOS --------------------
+app.get("/todos", auth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const todos = await TodoModel.find({ userId });
+        res.json({ todos });
+    } catch (err) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// -------------------- START SERVER --------------------
+app.listen(3000, () => {
     console.log("Server is running on port 3000");
 });

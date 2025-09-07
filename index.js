@@ -15,11 +15,7 @@ const app = express();
 app.use(express.json());
 
 const JWT_SECRET = "your_jwt_secret"; // ideally use process.env.JWT_SECRET
-const MONGO_URI = "mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.jnwwvsf.mongodb.net/todos";
-
-mongoose.connect(MONGO_URI)
-    .then(() => console.log("MongoDB connected"))
-    .catch(err => console.error("MongoDB connection error:", err));
+const mongoose = "mongodb+srv://rajpurohitnikhil008:rajpurohit@cluster0.jnwwvsf.mongodb.net/todos";
 
 // -------------------- AUTH MIDDLEWARE --------------------
 function auth(req, res, next) {
